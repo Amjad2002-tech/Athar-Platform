@@ -154,3 +154,41 @@ else:
         else:
 
             st.info("No staff interactions recorded yet. Go be a boss!")
+
+
+# ... (ألصق هذا الكود في آخر الملف، بعد الرسوم البيانية) ...
+
+st.markdown("---")
+
+# ==========================================
+# 🚨 ADMIN DANGER ZONE (منطقة الخطر)
+# ==========================================
+with st.expander("🚨 Admin Settings (Danger Zone)"):
+    st.write("⚠️ **Warning:** This action cannot be undone. It will permanently delete visitor data for YOUR company only.")
+    
+    # 1. طلب الكود السري
+    secret_code = st.text_input("Enter Security Code to Confirm Reset", type="password", help="Contact System Admin for code")
+    
+    # 2. زر الحذف
+    if st.button("🗑️ Clear All Visitor History"):
+        if secret_code == "2030":  # <--- غير الكود السري هنا
+            try:
+                # أ. نجيب أرقام فروع الشركة الحالية فقط (عشان ما نمسح بيانات الناس الثانيين)
+                locs = supabase.table('locations').select('id').eq('company_id', company_id).execute()
+                loc_ids = [l['id'] for l in locs.data]
+
+                if loc_ids:
+                    # ب. نمسح السجلات المرتبطة بهذه الفروع
+                    supabase.table('traffic_logs').delete().in_('location_id', loc_ids).execute()
+                    
+                    st.success("✅ Success! All data has been wiped.")
+                    time.sleep(1)
+                    st.rerun() # إعادة تحميل الصفحة لتصفير العدادات
+                else:
+                    st.warning("No locations found for this company.")
+                    
+            except Exception as e:
+                st.error(f"Error: {e}")
+        else:
+            st.error("❌ Wrong Security Code! Access Denied.")
+
