@@ -47,7 +47,7 @@ if not st.session_state.user:
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        email = st.text_input("Email", "admin@Audi.com")
+        email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         if st.button("Sign In"):
             login(email, password)
@@ -152,4 +152,5 @@ else:
                     leaderboard = staff_interactions.groupby('staff_name')['response_time'].mean().reset_index().sort_values('response_time')
                     st.dataframe(leaderboard, use_container_width=True)
         else:
+
             st.info("No staff interactions recorded yet. Go be a boss!")
