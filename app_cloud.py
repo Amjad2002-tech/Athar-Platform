@@ -7,9 +7,15 @@ import time
 # --- CONFIG ---
 st.set_page_config(page_title="ATHAR Cloud Platform", page_icon="☁️", layout="wide")
 
-# ⚠️⚠️⚠️ ضـــــــــع مــــفـــــاتـــــيـــــحــــك الـــصـــحـــيـــحـــة هـــــــــنـــــــــا ⚠️⚠️⚠️
-SUPABASE_URL = "https://ygfjtmotowdsfkohxfmw.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlnZmp0bW90b3dkc2Zrb2h4Zm13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTk1NzMsImV4cCI6MjA4MzgzNTU3M30.wx2wc3rJ7VZ1V-ZIea5pBlX60vybbItxBiTYBl1R45c"
+# ⚠️ تأكد أن هذا الكود يستخدم Secrets عند الرفع، أو مفاتيحك المباشرة للتجربة
+# للحماية استخدمنا st.secrets، إذا كنت تجرب محلياً استبدلها بمفاتيحك
+try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except:
+    # ضع مفاتيحك هنا للتجربة المحلية فقط
+    SUPABASE_URL = "https://ygfjtmotowdsfkohxfmw.supabase.co"
+    SUPABASE_KEY = "ضع_مفتاحك_الطويل_جدا_هنا_بدون_sb"
 
 # Connect to DB
 @st.cache_resource
@@ -47,7 +53,7 @@ if not st.session_state.user:
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        email = st.text_input("Email")
+        email = st.text_input("Email") 
         password = st.text_input("Password", type="password")
         if st.button("Sign In"):
             login(email, password)
@@ -55,7 +61,7 @@ if not st.session_state.user:
     st.stop()
 
 # ==========================================
-# MAIN DASHBOARD (ONLY FOR LOGGED IN USERS)
+# MAIN DASHBOARD
 # ==========================================
 user = st.session_state.user
 company_id = user['company_id']
@@ -70,7 +76,7 @@ with c2:
 
 st.markdown("---")
 
-# 1. FETCH DATA (FOR THIS COMPANY ONLY)
+# 1. FETCH DATA
 def get_company_data():
     try:
         # Get Locations
@@ -85,8 +91,6 @@ def get_company_data():
         df = pd.DataFrame(logs.data)
         if not df.empty:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
-            # Convert to Local Time (Optional)
-            # df['timestamp'] = df['timestamp'].dt.tz_convert('Asia/Riyadh') 
         return df
     except:
         return pd.DataFrame()
@@ -99,13 +103,14 @@ df = get_company_data()
 if df.empty:
     st.info("No data available for your company yet.")
 else:
-    # --- DATA PROCESSING ---
-    # نفصل البيانات: زوار vs تفاعل موظفين
-    guests = df[df['visitor_type'] == 'Guest']
+    # --- DATA PROCESSING (FIXED LOGIC) ---
     
-    # تصحيح: قد يكون الاسم Staff_Interaction أو interaction
-    # نبحث عن أي شيء فيه كلمة Staff
+    # 1. الموظفين: أي شيء يحتوي على 'Staff'
     staff_interactions = df[df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
+    
+    # 2. الزوار: كل الباقي (Guest, Guest_01, Guest_02...)
+    # أي صف ليس موظفاً نعتبره زائر
+    guests = df[~df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
 
     # --- KPIs ---
     k1, k2, k3, k4 = st.columns(4)
@@ -130,13 +135,18 @@ else:
         with c1:
             st.subheader("Traffic by Zone")
             if not guests.empty:
+                # Group by Zone
                 fig_bar = px.bar(guests['zone_name'].value_counts(), 
                                  title="Where do customers stop?", 
                                  color_discrete_sequence=['#00CC96'])
                 st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                st.info("No guest data.")
+                
         with c2:
-            st.subheader("Recent Activity")
-            st.dataframe(guests[['timestamp', 'zone_name', 'duration']].head(10), use_container_width=True)
+            st.subheader("Recent Activity (Live Feed)")
+            # نعرض هنا اسم الزائر (Guest_01) لتعرف من زارك
+            st.dataframe(guests[['timestamp', 'visitor_type', 'zone_name', 'duration']].head(10), use_container_width=True)
 
     with tab2:
         if not staff_interactions.empty:
@@ -152,43 +162,24 @@ else:
                     leaderboard = staff_interactions.groupby('staff_name')['response_time'].mean().reset_index().sort_values('response_time')
                     st.dataframe(leaderboard, use_container_width=True)
         else:
+            st.info("No staff interactions recorded yet.")
 
-            st.info("No staff interactions recorded yet. Go be a boss!")
-
-
-# ... (ألصق هذا الكود في آخر الملف، بعد الرسوم البيانية) ...
-
+# --- ADMIN ZONE ---
 st.markdown("---")
-
-# ==========================================
-# 🚨 ADMIN DANGER ZONE (منطقة الخطر)
-# ==========================================
 with st.expander("🚨 Admin Settings (Danger Zone)"):
-    st.write("⚠️ **Warning:** This action cannot be undone. It will permanently delete visitor data for YOUR company only.")
+    st.write("⚠️ **Warning:** This action cannot be undone.")
+    secret_code = st.text_input("Enter Security Code", type="password")
     
-    # 1. طلب الكود السري
-    secret_code = st.text_input("Enter Security Code to Confirm Reset", type="password", help="Contact System Admin for code")
-    
-    # 2. زر الحذف
-    if st.button("🗑️ Clear All Visitor History"):
-        if secret_code == "2030":  # <--- غير الكود السري هنا
+    if st.button("🗑️ Clear All History"):
+        if secret_code == "2030":
             try:
-                # أ. نجيب أرقام فروع الشركة الحالية فقط (عشان ما نمسح بيانات الناس الثانيين)
                 locs = supabase.table('locations').select('id').eq('company_id', company_id).execute()
                 loc_ids = [l['id'] for l in locs.data]
-
                 if loc_ids:
-                    # ب. نمسح السجلات المرتبطة بهذه الفروع
                     supabase.table('traffic_logs').delete().in_('location_id', loc_ids).execute()
-                    
-                    st.success("✅ Success! All data has been wiped.")
+                    st.success("✅ Wiped!")
                     time.sleep(1)
-                    st.rerun() # إعادة تحميل الصفحة لتصفير العدادات
-                else:
-                    st.warning("No locations found for this company.")
-                    
-            except Exception as e:
-                st.error(f"Error: {e}")
+                    st.rerun()
+            except: st.error("Error clearing data.")
         else:
-            st.error("❌ Wrong Security Code! Access Denied.")
-
+            st.error("❌ Wrong Code")
