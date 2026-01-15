@@ -12,13 +12,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. SECURE CONNECTION (Fixed Indentation) ---
-try:
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except:
-    st.error("⚠️ Secrets not found! Please check your .streamlit/secrets.toml or Streamlit Cloud settings.")
-    st.stop()
+# --- 2. SECURE CONNECTION (Fixed) ---
+# تم إزالة المسافات الزائدة والعودة للطريقة المباشرة
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 @st.cache_resource
 def init_connection():
@@ -32,13 +29,18 @@ supabase = init_connection()
 if 'user' not in st.session_state: st.session_state.user = None
 
 def login(email, password):
+    if not supabase:
+        st.error("⚠️ Database connection failed. Check secrets.")
+        return
+
     try:
         response = supabase.table('app_users').select("*").eq('email', email).eq('password', password).execute()
         if len(response.data) > 0:
             st.session_state.user = response.data[0]
             st.rerun()
         else: st.error("❌ Invalid Credentials")
-    except: st.error("⚠️ Connection Error")
+    except Exception as e: 
+        st.error(f"⚠️ Error: {e}")
 
 def logout():
     st.session_state.user = None
@@ -68,7 +70,7 @@ company_id = user['company_id']
 
 # --- SIDEBAR NAVIGATION ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=50) # أيقونة افتراضية
+    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=50)
     st.title(f"Welcome, {user['name']}")
     st.caption(f"Role: {user['role']}")
     st.markdown("---")
@@ -81,7 +83,7 @@ with st.sidebar:
         logout()
 
 # ==========================================
-# PAGE 1: HOME & VISION (The Pitch)
+# PAGE 1: HOME & VISION
 # ==========================================
 if page == "🏠 Home & Vision":
     st.title("🚀 ATHAR Insight")
@@ -118,15 +120,13 @@ if page == "🏠 Home & Vision":
         }), hide_index=True)
 
 # ==========================================
-# PAGE 2: LIVE DASHBOARD (The Data)
+# PAGE 2: LIVE DASHBOARD
 # ==========================================
 elif page == "📊 Live Dashboard":
     st.title("📊 Operational Dashboard")
     
-    # Refresh Button
     if st.button("🔄 Sync Data"): st.rerun()
 
-    # Fetch Data
     def get_data():
         try:
             locs = supabase.table('locations').select('id').eq('company_id', company_id).execute()
@@ -143,24 +143,19 @@ elif page == "📊 Live Dashboard":
     if df.empty:
         st.info("Waiting for live data feed...")
     else:
-        # Process Data
         staff_df = df[df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
         guest_df = df[~df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
 
-        # 1. Top Level Metrics
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("🛒 Unique Visitors", len(guest_df))
         m2.metric("👔 Staff Actions", len(staff_df))
-        
         avg_dwell = guest_df['duration'].mean() if not guest_df.empty else 0
         m3.metric("⏱️ Avg Engagement", f"{avg_dwell:.1f} sec")
-        
         hot_zone = guest_df['zone_name'].mode()[0] if not guest_df.empty else "N/A"
         m4.metric("🔥 Hot Zone", hot_zone)
 
         st.markdown("---")
 
-        # 2. Charts Area
         tab1, tab2 = st.tabs(["📈 Traffic Analysis", "👔 Staff Audit"])
         
         with tab1:
@@ -190,14 +185,13 @@ elif page == "📊 Live Dashboard":
                 st.info("No staff interactions recorded yet.")
 
 # ==========================================
-# PAGE 3: SYSTEM CONTROL (The Backend)
+# PAGE 3: SYSTEM CONTROL
 # ==========================================
 elif page == "⚙️ System Control":
     st.title("⚙️ Admin Control Center")
     
     st.markdown("### 📡 Remote Camera Access")
     
-    # 1. Camera Switch logic
     col_switch, col_status = st.columns([1, 2])
     
     current_status = "UNKNOWN"
@@ -219,19 +213,13 @@ elif page == "⚙️ System Control":
                 st.rerun()
     
     with col_status:
-        st.info("""
-        **Instructions:**
-        1. Ensure the on-site PC is running the `main.py` script.
-        2. Use this switch to start/stop the AI engine remotely.
-        3. Latency is typically 1-2 seconds.
-        """)
+        st.info("Instructions: Ensure the on-site PC is running the main.py script. Use this switch to start/stop the AI engine remotely.")
 
     st.markdown("---")
     
-    # 2. Database Wipe
     st.markdown("### 🗑️ Data Management")
     with st.expander("🚨 Danger Zone (Clear Database)"):
-        st.warning("This action cannot be undone. It will delete all logs.")
+        st.warning("This action cannot be undone.")
         pin = st.text_input("Enter Admin PIN", type="password")
         if st.button("Wipe All Data"):
             if pin == "2030":
