@@ -12,10 +12,6 @@ st.set_page_config(page_title="ATHAR Cloud Platform", page_icon="☁️", layout
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except:
-    # ضع مفاتيحك هنا للتجربة المحلية فقط
-    SUPABASE_URL = "https://ygfjtmotowdsfkohxfmw.supabase.co"
-    SUPABASE_KEY = "ضع_مفتاحك_الطويل_جدا_هنا_بدون_sb"
 
 # Connect to DB
 @st.cache_resource
@@ -183,3 +179,4 @@ with st.expander("🚨 Admin Settings (Danger Zone)"):
             except: st.error("Error clearing data.")
         else:
             st.error("❌ Wrong Code")
+
