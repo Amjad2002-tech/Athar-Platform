@@ -111,7 +111,7 @@ if page == "🏠 Home & Vision":
         }), hide_index=True)
 
 # ==========================================
-# PAGE 2: DASHBOARD (FIXED & INTERACTIVE)
+# PAGE 2: DASHBOARD (FULL VERSION)
 # ==========================================
 elif page == "📊 Live Dashboard":
     st.title("📊 Operational Dashboard")
@@ -123,7 +123,7 @@ elif page == "📊 Live Dashboard":
             locs = supabase.table('locations').select('id').eq('company_id', company_id).execute()
             loc_ids = [l['id'] for l in locs.data]
             if not loc_ids: return pd.DataFrame()
-            logs = supabase.table('traffic_logs').select('*').in_('location_id', loc_ids).order('timestamp', desc=True).limit(500).execute()
+            logs = supabase.table('traffic_logs').select('*').in_('location_id', loc_ids).order('timestamp', desc=True).limit(1000).execute()
             df = pd.DataFrame(logs.data)
             if not df.empty: df['timestamp'] = pd.to_datetime(df['timestamp'])
             return df
@@ -137,6 +137,7 @@ elif page == "📊 Live Dashboard":
         staff_df = df[df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
         guest_df = df[~df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
 
+        # --- METRICS ---
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("🛒 Unique Visitors", len(guest_df))
         m2.metric("👔 Staff Actions", len(staff_df))
@@ -150,29 +151,27 @@ elif page == "📊 Live Dashboard":
         tab1, tab2 = st.tabs(["📈 Traffic Analysis", "👔 Staff Audit"])
         
         with tab1:
-            c1, c2 = st.columns([2, 1])
+            # --- ROW 1: BAR CHART & DRILL DOWN ---
+            c1, c2 = st.columns([2, 1]) 
             with c1:
                 st.subheader("📍 Interest by Zone (Interactive)")
                 
                 if not guest_df.empty:
-                    # Prepare Data
                     chart_data = guest_df['zone_name'].value_counts().reset_index()
                     chart_data.columns = ['Zone', 'Visitors']
 
-                    # ✅ FIX: Using solid color to prevent ZeroDivisionError and SyntaxError
+                    # ✅ FIX: Using solid color to avoid errors
                     fig = px.bar(chart_data, 
                                  x='Zone', 
                                  y='Visitors', 
                                  color_discrete_sequence=['#00CC96'])
                     
-                    # Interactive Chart
                     event = st.plotly_chart(fig, use_container_width=True, on_select="rerun")
-
                 else:
                     st.info("No data.")
 
             with c2:
-                # Drill-Down Logic
+                # Drill Down Logic
                 selected_zone = None
                 if 'selection' in event and event.selection and len(event.selection['points']) > 0:
                     selected_zone = event.selection['points'][0]['x']
@@ -195,16 +194,47 @@ elif page == "📊 Live Dashboard":
                         use_container_width=True,
                         hide_index=True
                     )
+
+            st.markdown("---")
+
+            # --- ROW 2: HISTOGRAM & PEAK HOURS (RESTORED) ---
+            c3, c4 = st.columns(2)
+            
+            with c3:
+                st.subheader("⏳ How long do they stay?")
+                if not guest_df.empty:
+                    # ✅ THIS IS THE CHART YOU WANTED BACK
+                    fig_hist = px.histogram(guest_df, x="duration", nbins=15, 
+                                          title="Engagement Distribution", 
+                                          color_discrete_sequence=['#FF4B4B'])
+                    st.plotly_chart(fig_hist, use_container_width=True)
+            
+            with c4:
+                st.subheader("🌊 Peak Hours Activity")
+                if not guest_df.empty:
+                    guest_df['Hour'] = guest_df['timestamp'].dt.hour
+                    hourly_counts = guest_df.groupby('Hour').size().reset_index(name='Visitors')
+                    fig_line = px.area(hourly_counts, x='Hour', y='Visitors', markers=True, 
+                                     color_discrete_sequence=['#00CC96'])
+                    st.plotly_chart(fig_line, use_container_width=True)
+
         with tab2:
             if not staff_df.empty:
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.subheader("Response Speed Distribution")
+                    st.subheader("⚡ Response Speed")
                     fig2 = px.box(staff_df, x='staff_name', y='response_time', color='staff_name')
                     st.plotly_chart(fig2, use_container_width=True)
                 with c2:
-                    st.subheader("Interaction Logs")
-                    st.dataframe(staff_df[['timestamp', 'staff_name', 'zone_name', 'response_time']].head(10))
+                    st.subheader("🏆 Most Active Staff")
+                    staff_counts = staff_df['staff_name'].value_counts().reset_index()
+                    staff_counts.columns = ['Name', 'Interactions']
+                    fig_bar_staff = px.bar(staff_counts, x='Name', y='Interactions', 
+                                         color='Interactions', color_continuous_scale='Blues')
+                    st.plotly_chart(fig_bar_staff, use_container_width=True)
+                
+                st.subheader("Interaction Logs")
+                st.dataframe(staff_df[['timestamp', 'staff_name', 'zone_name', 'response_time']].head(10), use_container_width=True)
             else:
                 st.info("No staff interactions recorded yet.")
 
