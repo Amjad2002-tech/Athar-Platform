@@ -85,7 +85,7 @@ with st.sidebar:
         logout()
 
 # ==========================================
-# PAGE 1: HOME
+# PAGE 1: HOME & VISION
 # ==========================================
 if page == "🏠 Home & Vision":
     st.title("🚀 ATHAR Insight")
@@ -111,7 +111,7 @@ if page == "🏠 Home & Vision":
         }), hide_index=True)
 
 # ==========================================
-# PAGE 2: DASHBOARD (FIXED CHART ERROR)
+# PAGE 2: DASHBOARD (FIXED & INTERACTIVE)
 # ==========================================
 elif page == "📊 Live Dashboard":
     st.title("📊 Operational Dashboard")
@@ -152,16 +152,4 @@ elif page == "📊 Live Dashboard":
         with tab1:
             c1, c2 = st.columns([2, 1])
             with c1:
-                st.subheader("📍 Interest by Zone (Interactive)")
-                
-                if not guest_df.empty:
-                    # Prepare Data
-                    chart_data = guest_df['zone_name'].value_counts().reset_index()
-                    chart_data.columns = ['Zone', 'Visitors']
-
-                    # ✅ FIX: Removed 'color' mapping to prevent ZeroDivisionError
-                    # We use a solid color sequence instead. Safer and cleaner.
-                    fig = px.bar(chart_data, 
-                                 x='Zone', 
-                                 y='Visitors', 
-                                 color_discrete_sequence=['#
+                st.subheader("📍 Interest by Zone (
