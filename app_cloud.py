@@ -13,11 +13,12 @@ st.set_page_config(
 )
 
 # --- 2. SECURE CONNECTION ---
+# تم إزالة المسافات الزائدة هنا - هذا كان سبب الخطأ الأول
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 except:
-    st.error("⚠️ Secrets not found! Check .streamlit/secrets.toml")
+    st.error("⚠️ Secrets not found! Please check your .streamlit/secrets.toml")
     st.stop()
 
 @st.cache_resource
@@ -33,8 +34,9 @@ if 'user' not in st.session_state: st.session_state.user = None
 
 def login(email, password):
     if not supabase:
-        st.error("⚠️ Connection Failed")
+        st.error("⚠️ Database Connection Failed")
         return
+        
     try:
         response = supabase.table('app_users').select("*").eq('email', email).eq('password', password).execute()
         if len(response.data) > 0:
@@ -47,7 +49,7 @@ def logout():
     st.session_state.user = None
     st.rerun()
 
-# --- 4. LOGIN SCREEN ---
+# --- 4. LOGIN SCREEN (THE GATE) ---
 if not st.session_state.user:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -55,56 +57,82 @@ if not st.session_state.user:
         st.title("🚀 ATHAR Insight")
         st.markdown("##### The Future of In-Store Analytics")
         st.info("Please sign in to access the management console.")
+        
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
-        if st.button("Log In", use_container_width=True): login(email, password)
+        
+        if st.button("Log In", use_container_width=True):
+            login(email, password)
     st.stop()
 
 # ==========================================
-# 🌟 MAIN APPLICATION
+# 🌟 MAIN APPLICATION (LOGGED IN)
 # ==========================================
 user = st.session_state.user
-company_id = user.get('company_id', 1)
+company_id = user.get('company_id', 1) # حماية من الخطأ
 
-# --- SIDEBAR ---
+# --- SIDEBAR NAVIGATION ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=50)
     st.title(f"Welcome, {user.get('name', 'User')}")
-    st.caption(f"Role: {user.get('role', 'Manager')}")
+    
+    # ✅ FIX: Safe Role Access (حماية من الخطأ الثاني)
+    # إذا لم يوجد عمود role، سيعرض Manager افتراضياً
+    user_role = user.get('role', 'Manager') 
+    st.caption(f"Role: {user_role}")
+    
     st.markdown("---")
+    
+    # القائمة الجانبية
     page = st.radio("Navigate", ["🏠 Home & Vision", "📊 Live Dashboard", "⚙️ System Control"])
+    
     st.markdown("---")
-    if st.button("🚪 Log Out", use_container_width=True): logout()
+    if st.button("🚪 Log Out", use_container_width=True):
+        logout()
 
 # ==========================================
-# PAGE 1: HOME
+# PAGE 1: HOME & VISION
 # ==========================================
 if page == "🏠 Home & Vision":
     st.title("🚀 ATHAR Insight")
     st.markdown("### *Transforming Showrooms into Smart Data Hubs*")
     st.markdown("---")
-    c1, c2 = st.columns([2, 1])
-    with c1:
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
         st.subheader("💡 The Concept")
         st.write("""
         **ATHAR Insight** solves the biggest blind spot in physical retail: **"What happens before the sale?"**
-        Using advanced AI, we track:
-        * **Customer Journey:** Identifies which zones attract the most attention.
+        
+        While e-commerce tracks every click, physical showrooms have been flying blind. Not anymore.
+        Our AI-powered Computer Vision system provides:
+        
+        * **Customer Journey Tracking:** Identifies which zones attract the most attention.
         * **True Dwell Time:** Measures actual engagement, not just footfall.
         * **Staff Performance:** Audits response times automatically.
         """)
-    with c2:
-        st.warning("⚠️ Traditional vs. ATHAR")
+        
+        st.markdown("#### 🎯 Strategic Value")
+        st.success("""
+        * **Optimize Layouts:** Move high-margin cars to Hot Zones.
+        * **Improve Service:** Alert staff when customers wait too long.
+        * **Data-Driven Decisions:** Replace "gut feeling" with hard numbers.
+        """)
+
+    with col2:
+        st.warning("⚠️ Traditional Counters vs. ATHAR")
         st.dataframe(pd.DataFrame({
-            "Traditional": ["Head count only", "Hardware sensors", "No Staff filter"],
-            "ATHAR AI": ["Behavior Analytics", "Computer Vision", "Staff Filtering"]
+            "Traditional": ["Counts heads only", "Dumb sensors", "No Staff filtering", "Offline Data"],
+            "ATHAR AI": ["Tracks Behavior", "Computer Vision", "Filters Staff", "Real-time Cloud"]
         }), hide_index=True)
 
 # ==========================================
-# PAGE 2: DASHBOARD (UPDATED WITH MORE CHARTS) 📊
+# PAGE 2: LIVE DASHBOARD
 # ==========================================
 elif page == "📊 Live Dashboard":
     st.title("📊 Operational Dashboard")
+    
     if st.button("🔄 Sync Data"): st.rerun()
 
     def get_data():
@@ -112,7 +140,7 @@ elif page == "📊 Live Dashboard":
             locs = supabase.table('locations').select('id').eq('company_id', company_id).execute()
             loc_ids = [l['id'] for l in locs.data]
             if not loc_ids: return pd.DataFrame()
-            logs = supabase.table('traffic_logs').select('*').in_('location_id', loc_ids).order('timestamp', desc=True).limit(1000).execute()
+            logs = supabase.table('traffic_logs').select('*').in_('location_id', loc_ids).order('timestamp', desc=True).limit(500).execute()
             df = pd.DataFrame(logs.data)
             if not df.empty: df['timestamp'] = pd.to_datetime(df['timestamp'])
             return df
@@ -123,11 +151,9 @@ elif page == "📊 Live Dashboard":
     if df.empty:
         st.info("Waiting for live data feed...")
     else:
-        # Data Splitting
         staff_df = df[df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
         guest_df = df[~df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
 
-        # --- TOP METRICS ---
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("🛒 Unique Visitors", len(guest_df))
         m2.metric("👔 Staff Actions", len(staff_df))
@@ -138,56 +164,76 @@ elif page == "📊 Live Dashboard":
 
         st.markdown("---")
 
-        # --- TABS FOR CHARTS ---
         tab1, tab2 = st.tabs(["📈 Traffic Analysis", "👔 Staff Audit"])
         
         with tab1:
-            # Row 1: Zone Interest + Engagement Distribution
-            c1, c2 = st.columns(2)
+            c1, c2 = st.columns([2, 1])
             with c1:
-                st.subheader("📍 Interest by Zone")
+                st.subheader("📍 Interest by Zone (Interactive)")
+                
                 if not guest_df.empty:
-                    fig = px.bar(guest_df['zone_name'].value_counts(), orientation='h', color_discrete_sequence=['#00CC96'])
-                    st.plotly_chart(fig, use_container_width=True)
+                    # 1. تجهيز البيانات بشكل منظم
+                    # نحولها لجدول عشان نقدر نتحكم في المحاور
+                    chart_data = guest_df['zone_name'].value_counts().reset_index()
+                    chart_data.columns = ['Zone', 'Visitors'] # تسمية الأعمدة بوضوح
+
+                    # 2. رسم الشارت
+                    fig = px.bar(chart_data, 
+                                 x='Zone', 
+                                 y='Visitors', 
+                                 color='Visitors',
+                                 color_continuous_scale=['#00CC96'])
+                    
+                    # 3. عرض الشارت مع تفعيل التفاعل (THE MAGIC PART)
+                    # on_select="rerun": يعني لما تضغط، عيد تحميل الصفحة بالبيانات الجديدة
+                    event = st.plotly_chart(fig, use_container_width=True, on_select="rerun")
+
+                else:
+                    st.info("No data.")
+
             with c2:
-                st.subheader("⏳ Engagement Time (Seconds)")
-                if not guest_df.empty:
-                    # رسم بياني يوضح توزيع الأوقات (هل الناس يطولون ولا يمشون بسرعة؟)
-                    fig_hist = px.histogram(guest_df, x="duration", nbins=15, title="How long do they stay?", color_discrete_sequence=['#FF4B4B'])
-                    st.plotly_chart(fig_hist, use_container_width=True)
-
-            # Row 2: Peak Hours Analysis (NEW)
-            st.subheader("🌊 Peak Hours (Activity over Time)")
-            if not guest_df.empty:
-                # استخراج الساعة من الوقت
-                guest_df['Hour'] = guest_df['timestamp'].dt.hour
-                hourly_counts = guest_df.groupby('Hour').size().reset_index(name='Visitors')
-                fig_line = px.area(hourly_counts, x='Hour', y='Visitors', markers=True, color_discrete_sequence=['#00CC96'])
-                st.plotly_chart(fig_line, use_container_width=True)
-
-            # Row 3: Data Table
-            st.subheader("📋 Recent Visitor Log")
-            st.dataframe(guest_df[['timestamp', 'visitor_type', 'zone_name', 'duration']].head(10), use_container_width=True)
-
+                # 4. التقاط الضغطة (The Drill-Down)
+                selected_zone = None
+                
+                # فحص هل تم الضغط على شيء؟
+                if len(event.selection['points']) > 0:
+                    # استخراج اسم المنطقة من البار اللي انضغط
+                    selected_zone = event.selection['points'][0]['x']
+                    
+                    st.subheader(f"🔎 Details: {selected_zone}")
+                    
+                    # فلتر البيانات بناءً على الضغطة
+                    filtered_df = guest_df[guest_df['zone_name'] == selected_zone]
+                    
+                    # عرض الجدول المفلتر
+                    st.dataframe(
+                        filtered_df[['timestamp', 'visitor_type', 'duration']].sort_values(by='timestamp', ascending=False), 
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    # زر لإلغاء الفلتر
+                    if st.button("❌ Clear Filter"): st.rerun()
+                    
+                else:
+                    # الحالة الطبيعية (بدون ضغط)
+                    st.subheader("📋 Recent Activity")
+                    st.caption("👆 Click on any bar to filter this list")
+                    st.dataframe(
+                        guest_df[['timestamp', 'visitor_type', 'zone_name', 'duration']].head(10), 
+                        use_container_width=True,
+                        hide_index=True
+                    )
         with tab2:
-            # Row 1: Response Speed + Most Active Staff
-            c1, c2 = st.columns(2)
             if not staff_df.empty:
+                c1, c2 = st.columns(2)
                 with c1:
-                    st.subheader("⚡ Response Speed")
+                    st.subheader("Response Speed Distribution")
                     fig2 = px.box(staff_df, x='staff_name', y='response_time', color='staff_name')
                     st.plotly_chart(fig2, use_container_width=True)
                 with c2:
-                    st.subheader("🏆 Most Active Staff")
-                    # رسم بياني للموظف الأكثر عملاً
-                    staff_counts = staff_df['staff_name'].value_counts().reset_index()
-                    staff_counts.columns = ['Name', 'Interactions']
-                    fig_bar_staff = px.bar(staff_counts, x='Name', y='Interactions', color='Interactions', color_continuous_scale='Blues')
-                    st.plotly_chart(fig_bar_staff, use_container_width=True)
-                
-                # Row 2: Logs
-                st.subheader("📋 Staff Interaction Log")
-                st.dataframe(staff_df[['timestamp', 'staff_name', 'zone_name', 'response_time']].head(10), use_container_width=True)
+                    st.subheader("Interaction Logs")
+                    st.dataframe(staff_df[['timestamp', 'staff_name', 'zone_name', 'response_time']].head(10))
             else:
                 st.info("No staff interactions recorded yet.")
 
@@ -196,16 +242,18 @@ elif page == "📊 Live Dashboard":
 # ==========================================
 elif page == "⚙️ System Control":
     st.title("⚙️ Admin Control Center")
+    
     st.markdown("### 📡 Remote Camera Access")
     
-    c_ctrl, c_info = st.columns([1, 2])
-    with c_ctrl:
-        current_status = "UNKNOWN"
-        try:
-            res = supabase.table('device_control').select('status').eq('location_id', 1).execute()
-            if res.data: current_status = res.data[0]['status']
-        except: pass
+    col_switch, col_status = st.columns([1, 2])
+    
+    current_status = "UNKNOWN"
+    try:
+        res = supabase.table('device_control').select('status').eq('location_id', 1).execute()
+        if res.data: current_status = res.data[0]['status']
+    except: pass
 
+    with col_switch:
         if current_status == "START":
             st.success("Status: **ONLINE** 🟢")
             if st.button("⛔ STOP CAMERA", type="primary", use_container_width=True):
@@ -216,20 +264,26 @@ elif page == "⚙️ System Control":
             if st.button("▶️ START CAMERA", type="primary", use_container_width=True):
                 supabase.table('device_control').update({'status': 'START'}).eq('location_id', 1).execute()
                 st.rerun()
-    with c_info:
-        st.info("Instructions: Ensure the on-site PC is running the main.py script.")
+    
+    with col_status:
+        st.info("Instructions: Ensure the on-site PC is running the main.py script. Use this switch to start/stop the AI engine remotely.")
 
     st.markdown("---")
-    with st.expander("🚨 Danger Zone"):
-        pin = st.text_input("Admin PIN", type="password")
-        if st.button("Wipe Data"):
+    
+    st.markdown("### 🗑️ Data Management")
+    with st.expander("🚨 Danger Zone (Clear Database)"):
+        st.warning("This action cannot be undone.")
+        pin = st.text_input("Enter Admin PIN", type="password")
+        if st.button("Wipe All Data"):
             if pin == "2030":
                 try:
                     locs = supabase.table('locations').select('id').eq('company_id', company_id).execute()
                     ids = [l['id'] for l in locs.data]
                     if ids:
                         supabase.table('traffic_logs').delete().in_('location_id', ids).execute()
-                        st.success("Cleared!")
-                        time.sleep(1); st.rerun()
+                        st.success("Database Cleared!")
+                        time.sleep(1)
+                        st.rerun()
                 except: st.error("Failed.")
-            else: st.error("Wrong PIN")
+            else:
+                st.error("Incorrect PIN")
