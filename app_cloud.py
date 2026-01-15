@@ -13,8 +13,8 @@ st.set_page_config(
 )
 
 # --- 2. SECURE CONNECTION ---
-# تم إزالة المسافات الزائدة هنا - هذا كان سبب الخطأ الأول
 try:
+    # Corrected indentation here
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 except:
@@ -69,21 +69,20 @@ if not st.session_state.user:
 # 🌟 MAIN APPLICATION (LOGGED IN)
 # ==========================================
 user = st.session_state.user
-company_id = user.get('company_id', 1) # حماية من الخطأ
+company_id = user.get('company_id', 1) # Safer access with default
 
 # --- SIDEBAR NAVIGATION ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=50)
     st.title(f"Welcome, {user.get('name', 'User')}")
     
-    # ✅ FIX: Safe Role Access (حماية من الخطأ الثاني)
-    # إذا لم يوجد عمود role، سيعرض Manager افتراضياً
+    # ✅ FIX: Safe Role Access to prevent KeyError
     user_role = user.get('role', 'Manager') 
     st.caption(f"Role: {user_role}")
     
     st.markdown("---")
     
-    # القائمة الجانبية
+    # Navigation Menu
     page = st.radio("Navigate", ["🏠 Home & Vision", "📊 Live Dashboard", "⚙️ System Control"])
     
     st.markdown("---")
@@ -172,51 +171,33 @@ elif page == "📊 Live Dashboard":
                 st.subheader("📍 Interest by Zone (Interactive)")
                 
                 if not guest_df.empty:
-                    # 1. تجهيز البيانات بشكل منظم
-                    # نحولها لجدول عشان نقدر نتحكم في المحاور
                     chart_data = guest_df['zone_name'].value_counts().reset_index()
-                    chart_data.columns = ['Zone', 'Visitors'] # تسمية الأعمدة بوضوح
+                    chart_data.columns = ['Zone', 'Visitors']
 
-                    # 2. رسم الشارت
                     fig = px.bar(chart_data, 
                                  x='Zone', 
                                  y='Visitors', 
                                  color='Visitors',
                                  color_continuous_scale=['#00CC96'])
                     
-                    # 3. عرض الشارت مع تفعيل التفاعل (THE MAGIC PART)
-                    # on_select="rerun": يعني لما تضغط، عيد تحميل الصفحة بالبيانات الجديدة
                     event = st.plotly_chart(fig, use_container_width=True, on_select="rerun")
 
                 else:
                     st.info("No data.")
 
             with c2:
-                # 4. التقاط الضغطة (The Drill-Down)
                 selected_zone = None
-                
-                # فحص هل تم الضغط على شيء؟
-                if len(event.selection['points']) > 0:
-                    # استخراج اسم المنطقة من البار اللي انضغط
+                if 'selection' in event and event.selection and len(event.selection['points']) > 0:
                     selected_zone = event.selection['points'][0]['x']
-                    
                     st.subheader(f"🔎 Details: {selected_zone}")
-                    
-                    # فلتر البيانات بناءً على الضغطة
                     filtered_df = guest_df[guest_df['zone_name'] == selected_zone]
-                    
-                    # عرض الجدول المفلتر
                     st.dataframe(
                         filtered_df[['timestamp', 'visitor_type', 'duration']].sort_values(by='timestamp', ascending=False), 
                         use_container_width=True,
                         hide_index=True
                     )
-                    
-                    # زر لإلغاء الفلتر
                     if st.button("❌ Clear Filter"): st.rerun()
-                    
                 else:
-                    # الحالة الطبيعية (بدون ضغط)
                     st.subheader("📋 Recent Activity")
                     st.caption("👆 Click on any bar to filter this list")
                     st.dataframe(
