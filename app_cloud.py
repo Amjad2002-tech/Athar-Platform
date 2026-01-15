@@ -7,12 +7,9 @@ import time
 # --- CONFIG ---
 st.set_page_config(page_title="ATHAR Cloud Platform", page_icon="☁️", layout="wide")
 
-# ⚠️ تأكد أن هذا الكود يستخدم Secrets عند الرفع، أو مفاتيحك المباشرة للتجربة
-# للحماية استخدمنا st.secrets، إذا كنت تجرب محلياً استبدلها بمفاتيحك
-try:
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 # Connect to DB
 @st.cache_resource
 def init_connection():
@@ -179,4 +176,3 @@ with st.expander("🚨 Admin Settings (Danger Zone)"):
             except: st.error("Error clearing data.")
         else:
             st.error("❌ Wrong Code")
-
