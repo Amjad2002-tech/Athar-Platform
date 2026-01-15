@@ -13,12 +13,9 @@ st.set_page_config(
 )
 
 # --- SECRETS CONNECTION ---
-try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except:
-    st.error("⚠️ Secrets not found. Please configure .streamlit/secrets.toml")
-    st.stop()
+
 
 @st.cache_resource
 def init_connection():
@@ -246,3 +243,4 @@ elif selected_page == "⚙️ Settings & Control":
                 except: st.error("Failed to clear data.")
             else:
                 st.error("❌ Incorrect PIN.")
+
