@@ -12,10 +12,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. SECURE CONNECTION (Fixed) ---
-# تم إزالة المسافات الزائدة والعودة للطريقة المباشرة
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+# --- 2. SECURE CONNECTION ---
+# تم إزالة المسافات الزائدة هنا - هذا كان سبب الخطأ الأول
+try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except:
+    st.error("⚠️ Secrets not found! Please check your .streamlit/secrets.toml")
+    st.stop()
 
 @st.cache_resource
 def init_connection():
@@ -30,17 +34,16 @@ if 'user' not in st.session_state: st.session_state.user = None
 
 def login(email, password):
     if not supabase:
-        st.error("⚠️ Database connection failed. Check secrets.")
+        st.error("⚠️ Database Connection Failed")
         return
-
+        
     try:
         response = supabase.table('app_users').select("*").eq('email', email).eq('password', password).execute()
         if len(response.data) > 0:
             st.session_state.user = response.data[0]
             st.rerun()
         else: st.error("❌ Invalid Credentials")
-    except Exception as e: 
-        st.error(f"⚠️ Error: {e}")
+    except Exception as e: st.error(f"⚠️ Error: {e}")
 
 def logout():
     st.session_state.user = None
@@ -66,13 +69,18 @@ if not st.session_state.user:
 # 🌟 MAIN APPLICATION (LOGGED IN)
 # ==========================================
 user = st.session_state.user
-company_id = user['company_id']
+company_id = user.get('company_id', 1) # حماية من الخطأ
 
 # --- SIDEBAR NAVIGATION ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=50)
-    st.title(f"Welcome, {user['name']}")
-    st.caption(f"Role: {user['role']}")
+    st.title(f"Welcome, {user.get('name', 'User')}")
+    
+    # ✅ FIX: Safe Role Access (حماية من الخطأ الثاني)
+    # إذا لم يوجد عمود role، سيعرض Manager افتراضياً
+    user_role = user.get('role', 'Manager') 
+    st.caption(f"Role: {user_role}")
+    
     st.markdown("---")
     
     # القائمة الجانبية
