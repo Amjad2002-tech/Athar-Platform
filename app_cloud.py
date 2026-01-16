@@ -72,7 +72,9 @@ company_id = user.get('company_id', 1)
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=50)
+    # ✅ CHANGED: Camera Logo (Use "logo.png" here later for your own logo)
+    st.image("https://cdn-icons-png.flaticon.com/512/3687/3687412.png", width=60)
+    
     st.title(f"Welcome, {user.get('name', 'User')}")
     
     user_role = user.get('role', 'Manager') 
@@ -111,7 +113,7 @@ if page == "🏠 Home & Vision":
         }), hide_index=True)
 
 # ==========================================
-# PAGE 2: DASHBOARD (FULL VERSION)
+# PAGE 2: DASHBOARD
 # ==========================================
 elif page == "📊 Live Dashboard":
     st.title("📊 Operational Dashboard")
@@ -137,7 +139,6 @@ elif page == "📊 Live Dashboard":
         staff_df = df[df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
         guest_df = df[~df['visitor_type'].astype(str).str.contains('Staff', case=False, na=False)]
 
-        # --- METRICS ---
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("🛒 Unique Visitors", len(guest_df))
         m2.metric("👔 Staff Actions", len(staff_df))
@@ -151,72 +152,64 @@ elif page == "📊 Live Dashboard":
         tab1, tab2 = st.tabs(["📈 Traffic Analysis", "👔 Staff Audit"])
         
         with tab1:
-            # --- ROW 1: BAR CHART & DRILL DOWN ---
-            c1, c2 = st.columns([2, 1]) 
+            # --- SECTION 1: ZONES (INTERACTIVE) ---
+            c1, c2 = st.columns([1.5, 1]) 
             with c1:
-                st.subheader("📍 Interest by Zone (Interactive)")
-                
+                st.subheader("📍 Interest by Zone")
                 if not guest_df.empty:
                     chart_data = guest_df['zone_name'].value_counts().reset_index()
                     chart_data.columns = ['Zone', 'Visitors']
-
-                    # ✅ FIX: Using solid color to avoid errors
-                    fig = px.bar(chart_data, 
-                                 x='Zone', 
-                                 y='Visitors', 
-                                 color_discrete_sequence=['#00CC96'])
-                    
+                    fig = px.bar(chart_data, x='Zone', y='Visitors', color_discrete_sequence=['#00CC96'])
+                    # Interactive Chart
                     event = st.plotly_chart(fig, use_container_width=True, on_select="rerun")
-                else:
-                    st.info("No data.")
+                else: st.info("No data.")
 
             with c2:
-                # Drill Down Logic
-                selected_zone = None
+                # Drill Down Logic for Zones
                 if 'selection' in event and event.selection and len(event.selection['points']) > 0:
                     selected_zone = event.selection['points'][0]['x']
                     st.subheader(f"🔎 Details: {selected_zone}")
-                    
                     filtered_df = guest_df[guest_df['zone_name'] == selected_zone]
-                    
-                    st.dataframe(
-                        filtered_df[['timestamp', 'visitor_type', 'duration']].sort_values(by='timestamp', ascending=False), 
-                        use_container_width=True,
-                        hide_index=True
-                    )
-                    
-                    if st.button("❌ Clear Filter"): st.rerun()
+                    st.dataframe(filtered_df[['timestamp', 'visitor_type', 'duration']].sort_values(by='timestamp', ascending=False), use_container_width=True, hide_index=True)
                 else:
                     st.subheader("📋 Recent Activity")
-                    st.caption("👆 Click on any bar to filter this list")
-                    st.dataframe(
-                        guest_df[['timestamp', 'visitor_type', 'zone_name', 'duration']].head(10), 
-                        use_container_width=True,
-                        hide_index=True
-                    )
+                    st.caption("👆 Click chart to filter")
+                    st.dataframe(guest_df[['timestamp', 'visitor_type', 'zone_name', 'duration']].head(10), use_container_width=True, hide_index=True)
 
             st.markdown("---")
 
-            # --- ROW 2: HISTOGRAM & PEAK HOURS (RESTORED) ---
-            c3, c4 = st.columns(2)
-            
+            # --- SECTION 2: ENGAGEMENT (INTERACTIVE) ---
+            c3, c4 = st.columns([1.5, 1])
             with c3:
                 st.subheader("⏳ How long do they stay?")
                 if not guest_df.empty:
-                    # ✅ THIS IS THE CHART YOU WANTED BACK
-                    fig_hist = px.histogram(guest_df, x="duration", nbins=15, 
-                                          title="Engagement Distribution", 
-                                          color_discrete_sequence=['#FF4B4B'])
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                    # ✅ ADDED: Interactive Histogram
+                    fig_hist = px.histogram(guest_df, x="duration", nbins=15, title="Engagement Distribution", color_discrete_sequence=['#FF4B4B'])
+                    event_hist = st.plotly_chart(fig_hist, use_container_width=True, on_select="rerun")
             
             with c4:
-                st.subheader("🌊 Peak Hours Activity")
-                if not guest_df.empty:
-                    guest_df['Hour'] = guest_df['timestamp'].dt.hour
-                    hourly_counts = guest_df.groupby('Hour').size().reset_index(name='Visitors')
-                    fig_line = px.area(hourly_counts, x='Hour', y='Visitors', markers=True, 
-                                     color_discrete_sequence=['#00CC96'])
-                    st.plotly_chart(fig_line, use_container_width=True)
+                # ✅ ADDED: Drill Down Logic for Histogram
+                if 'selection' in event_hist and event_hist.selection and len(event_hist.selection['point_indices']) > 0:
+                    st.subheader("🔎 Filtered by Duration")
+                    # Get indices of selected points
+                    indices = event_hist.selection['point_indices']
+                    # Filter dataframe using indices
+                    hist_filtered_df = guest_df.iloc[indices]
+                    st.dataframe(hist_filtered_df[['timestamp', 'visitor_type', 'zone_name', 'duration']].sort_values(by='duration', ascending=False), use_container_width=True, hide_index=True)
+                else:
+                    st.subheader("📋 Engagement Details")
+                    st.caption("👆 Click chart to see who stayed this long")
+                    st.dataframe(guest_df[['timestamp', 'visitor_type', 'zone_name', 'duration']].sort_values(by='duration', ascending=False).head(10), use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+
+            # --- SECTION 3: PEAK HOURS ---
+            st.subheader("🌊 Peak Hours Activity")
+            if not guest_df.empty:
+                guest_df['Hour'] = guest_df['timestamp'].dt.hour
+                hourly_counts = guest_df.groupby('Hour').size().reset_index(name='Visitors')
+                fig_line = px.area(hourly_counts, x='Hour', y='Visitors', markers=True, color_discrete_sequence=['#00CC96'])
+                st.plotly_chart(fig_line, use_container_width=True)
 
         with tab2:
             if not staff_df.empty:
@@ -229,8 +222,7 @@ elif page == "📊 Live Dashboard":
                     st.subheader("🏆 Most Active Staff")
                     staff_counts = staff_df['staff_name'].value_counts().reset_index()
                     staff_counts.columns = ['Name', 'Interactions']
-                    fig_bar_staff = px.bar(staff_counts, x='Name', y='Interactions', 
-                                         color='Interactions', color_continuous_scale='Blues')
+                    fig_bar_staff = px.bar(staff_counts, x='Name', y='Interactions', color='Interactions', color_continuous_scale='Blues')
                     st.plotly_chart(fig_bar_staff, use_container_width=True)
                 
                 st.subheader("Interaction Logs")
